@@ -273,6 +273,21 @@ export function getPrompt(id) {
 export default function Prompts() {
   const navigate = useNavigate()
   const [prompts, setPrompts] = useState(loadPrompts)
+  const [geminiKey, setGeminiKey] = useState(() => {
+    try {
+      const saved = localStorage.getItem('mvppdfs_config')
+      return saved ? JSON.parse(saved).geminiKey || '' : ''
+    } catch { return '' }
+  })
+  const [keySaved, setKeySaved] = useState(false)
+
+  const saveKey = () => {
+    try {
+      localStorage.setItem('mvppdfs_config', JSON.stringify({ geminiKey }))
+      setKeySaved(true)
+      setTimeout(() => setKeySaved(false), 2000)
+    } catch {}
+  }
   const [selected, setSelected] = useState('ebook_principal')
   const [saved, setSaved] = useState(false)
   const [filterMode, setFilterMode] = useState('all') // 'all' | 'ebook' | 'pau'
@@ -331,6 +346,50 @@ export default function Prompts() {
             Editá los prompts que la IA usa para generar los ebooks y PAUs. Cuanto más específicos sean, mejor el resultado.
             Los cambios se guardan en tu navegador y se usan en todas las generaciones futuras.
           </p>
+        </div>
+
+        {/* API Key section */}
+        <div style={{
+          background: '#0a1a0a', border: '1px solid #22c55e33',
+          borderRadius: 14, padding: 20, marginBottom: 24,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+            <div style={{ flex: 1 }}>
+              <p style={{ color: '#22c55e', fontSize: 12, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>
+                🔑 GEMINI API KEY — Llamada directa (sin límite de tiempo)
+              </p>
+              <p style={{ color: '#555', fontSize: 12, lineHeight: 1.6, marginBottom: 12 }}>
+                Con la key guardada aquí la app llama directo a Gemini desde tu browser — sin pasar por Netlify, sin timeout, ebooks completos sin cortes.
+                Conseguila gratis en <a href="https://aistudio.google.com/apikey" target="_blank" style={{ color: '#22c55e' }}>aistudio.google.com/apikey</a>
+              </p>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  value={geminiKey}
+                  onChange={e => setGeminiKey(e.target.value)}
+                  placeholder="AIzaSy..."
+                  type="password"
+                  style={{ flex: 1, minWidth: 200, background: '#061006', borderColor: '#22c55e44', fontFamily: 'monospace', fontSize: 13 }}
+                />
+                <button onClick={saveKey} style={{
+                  background: keySaved ? '#16a34a' : '#22c55e',
+                  color: '#000', border: 'none', borderRadius: 8,
+                  padding: '10px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+                }}>
+                  {keySaved ? '✓ Guardada' : 'Guardar key'}
+                </button>
+              </div>
+              {geminiKey && (
+                <p style={{ color: '#22c55e', fontSize: 11, marginTop: 8 }}>
+                  ✓ Key configurada — la app usará llamada directa a Gemini sin timeout
+                </p>
+              )}
+              {!geminiKey && (
+                <p style={{ color: '#555', fontSize: 11, marginTop: 8 }}>
+                  Sin key local → usa el proxy de Netlify (puede tener timeout en ebooks largos)
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20 }}>
