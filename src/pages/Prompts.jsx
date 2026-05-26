@@ -366,7 +366,7 @@ export default function Prompts() {
                 <input
                   value={geminiKey}
                   onChange={e => setGeminiKey(e.target.value)}
-                  placeholder="AIzaSy..."
+                  placeholder="AIzaSyDcmZthvcgrPG_mlaZDYjHAtzt7-q-1ghM"
                   type="password"
                   style={{ flex: 1, minWidth: 200, background: '#061006', borderColor: '#22c55e44', fontFamily: 'monospace', fontSize: 13 }}
                 />
