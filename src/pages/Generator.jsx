@@ -18,7 +18,55 @@ function getStoredPrompt(id, fallback) {
 }
 
 // ── Llamada a Gemini ──────────────────────────────────────────────────────────
+// Lee la key de localStorage (configurada en /prompts)
+function getGeminiKey() {
+  try {
+    const saved = localStorage.getItem('mvppdfs_config')
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (parsed.geminiKey) return parsed.geminiKey
+    }
+  } catch {}
+  return null
+}
+
 async function callGemini(prompt, maxTokens = 8192) {
+  const key = getGeminiKey()
+
+  // Si hay key local, llama directo a Google (sin límite de tiempo)
+  if (key) {
+    const models = [
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-3.5-flash',
+      'gemini-3-flash',
+    ]
+    let lastError = null
+    for (const model of models) {
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: maxTokens },
+            }),
+          }
+        )
+        const data = await res.json()
+        if (res.status === 429 || res.status === 403) { lastError = data.error?.message || 'Quota'; continue }
+        if (!res.ok) throw new Error(data.error?.message || 'Error Gemini')
+        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        if (!text) { lastError = 'Respuesta vacía'; continue }
+        return text
+      } catch(e) { lastError = e.message; continue }
+    }
+    throw new Error('Todos los modelos fallaron: ' + lastError)
+  }
+
+  // Fallback: proxy de Netlify (con límite de 10s)
   const res = await fetch('/api/gemini', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -27,6 +75,39 @@ async function callGemini(prompt, maxTokens = 8192) {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Error en Gemini')
   return data.text
+}
+
+function safeParseJSON(text) {
+  // Clean markdown
+  let clean = text.replace(/```json|```/g, '').trim()
+  // Try direct parse
+  try { return JSON.parse(clean) } catch {}
+  // Find first { and last valid }
+  const start = clean.indexOf('{')
+  if (start === -1) throw new Error('No se encontró JSON en la respuesta')
+  clean = clean.slice(start)
+  // Try to close unclosed JSON by finding last complete array/object
+  // Remove incomplete last item
+  const lastComma = clean.lastIndexOf(',"')
+  const lastBracket = clean.lastIndexOf('}]')
+  const lastClose = Math.max(lastBracket, clean.lastIndexOf('}}'))
+  if (lastClose > 0) {
+    clean = clean.slice(0, lastClose + 2)
+    try { return JSON.parse(clean) } catch {}
+  }
+  // Try closing open structures
+  let opens = 0, openArr = 0
+  for (const c of clean) {
+    if (c === '{') opens++
+    if (c === '}') opens--
+    if (c === '[') openArr++
+    if (c === ']') openArr--
+  }
+  for (let i = 0; i < openArr; i++) clean += ']'
+  for (let i = 0; i < opens; i++) clean += '}'
+  try { return JSON.parse(clean) } catch(e) {
+    throw new Error('JSON incompleto — intentá con menos capítulos')
+  }
 }
 
 // ── STEP 1: Formulario ────────────────────────────────────────────────────────
@@ -290,8 +371,8 @@ function StepGenerating({ formData, onDone }) {
             '{"analisis":{"dolores":["..."],"avatar":"...","nicho":"...","angulo":"..."},"titulo":"...","subtitulo":"...","tagline":"...","capitulos":[{"numero":1,"titulo":"...","subtitulo":"...","elementos":["plantilla","checklist"]}]}',
           ].filter(Boolean).join('\n')
 
-          const r1 = await callGemini(p1, 2048)
-          const arq = JSON.parse(r1.replace(/```json|```/g, '').trim())
+          const r1 = await callGemini(p1, 3000)
+          const arq = safeParseJSON(r1)
 
           if (!cancelled) { add('PASO 2/3 — Escribiendo contenido completo...'); setProg(35) }
 
@@ -316,8 +397,8 @@ function StepGenerating({ formData, onDone }) {
             '{"capitulos":[{"numero":1,"titulo":"...","contenido":"texto completo con formato...","puntos_clave":["..."],"tip":"..."}]}',
           ].filter(Boolean).join('\n')
 
-          const r2 = await callGemini(p2, 4096)
-          const caps1 = JSON.parse(r2.replace(/```json|```/g, '').trim())
+          const r2 = await callGemini(p2, 8192)
+          const caps1 = safeParseJSON(r2)
 
           if (!cancelled) { add('PASO 3/3 — Escribiendo segunda mitad y bonos...'); setProg(65) }
 
@@ -338,8 +419,8 @@ function StepGenerating({ formData, onDone }) {
             '{"capitulos":[{"numero":' + (mitad + 1) + ',"titulo":"...","contenido":"...","puntos_clave":["..."],"tip":"..."}],"plan_accion":["AHORA: ...","MAÑANA: ...","EN 3 DÍAS: ..."],"cierre":"...","bonos":[{"numero":1,"titulo":"...","contenido":"texto completo del bono...","plan_accion_24hs":["..."]}]}',
           ].filter(Boolean).join('\n')
 
-          const r3 = await callGemini(p3, 4096)
-          const caps2 = JSON.parse(r3.replace(/```json|```/g, '').trim())
+          const r3 = await callGemini(p3, 8192)
+          const caps2 = safeParseJSON(r3)
 
           if (!cancelled) { add('Contenido completo generado ✓'); setProg(100) }
           await new Promise(r => setTimeout(r, 300))
@@ -379,8 +460,8 @@ function StepGenerating({ formData, onDone }) {
             '{"titulo":"...","subtitulo":"...","tagline":"...","introduccion":"texto completo...","capitulos":[{"numero":1,"titulo":"...","subtitulo":"..."}]}',
           ].filter(Boolean).join('\n')
 
-          const r1 = await callGemini(p1, 2048)
-          const estructura = JSON.parse(r1.replace(/```json|```/g, '').trim())
+          const r1 = await callGemini(p1, 3000)
+          const estructura = safeParseJSON(r1)
 
           if (!cancelled) { add('Escribiendo primera mitad del ebook...'); setProg(40) }
 
@@ -401,8 +482,8 @@ function StepGenerating({ formData, onDone }) {
             '{"capitulos":[{"numero":1,"titulo":"...","contenido":"texto completo...","puntos_clave":["..."],"tip":"..."}]}',
           ].filter(Boolean).join('\n')
 
-          const r2 = await callGemini(p2, 4096)
-          const caps1 = JSON.parse(r2.replace(/```json|```/g, '').trim())
+          const r2 = await callGemini(p2, 8192)
+          const caps1 = safeParseJSON(r2)
 
           if (!cancelled) { add('Escribiendo segunda mitad y bonos...'); setProg(65) }
 
@@ -412,7 +493,7 @@ function StepGenerating({ formData, onDone }) {
             'Escribí SOLO los capítulos ' + (numCapsFirst + 1) + ' al ' + Math.min(numCaps, numCapsFirst + 15) + ':',
             capsTitulos.split('\n').slice(numCapsFirst, numCapsFirst + 15).join('\n'),
             '',
-            'Reglas: mínimo 200 palabras por capítulo, bullets y listas.',
+            'Reglas: mínimo 400 palabras por capítulo, bullets y listas.',
             '',
             'Al final agregá:',
             '- plan_accion: ["AHORA: paso","MAÑANA: paso","EN 3 DIAS: paso"]',
@@ -423,8 +504,8 @@ function StepGenerating({ formData, onDone }) {
             '{"capitulos":[{"numero":' + (numCapsFirst + 1) + ',"titulo":"...","contenido":"...","puntos_clave":["..."],"tip":"..."}],"plan_accion":["AHORA: ...","MAÑANA: ...","EN 3 DIAS: ..."],"cierre":"...","bonos":[{"numero":1,"titulo":"...","contenido":"contenido del bono...","plan_accion_24hs":["..."]}]}',
           ].filter(Boolean).join('\n')
 
-          const r3 = await callGemini(p3, 4096)
-          const caps2 = JSON.parse(r3.replace(/```json|```/g, '').trim())
+          const r3 = await callGemini(p3, 8192)
+          const caps2 = safeParseJSON(r3)
 
           if (!cancelled) { add('Ebook completo generado ✓'); setProg(100) }
           await new Promise(r => setTimeout(r, 300))
