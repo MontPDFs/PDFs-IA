@@ -290,7 +290,7 @@ function StepGenerating({ formData, onDone }) {
             '{"analisis":{"dolores":["..."],"avatar":"...","nicho":"...","angulo":"..."},"titulo":"...","subtitulo":"...","tagline":"...","capitulos":[{"numero":1,"titulo":"...","subtitulo":"...","elementos":["plantilla","checklist"]}]}',
           ].filter(Boolean).join('\n')
 
-          const r1 = await callGemini(p1, 4096)
+          const r1 = await callGemini(p1, 2048)
           const arq = JSON.parse(r1.replace(/```json|```/g, '').trim())
 
           if (!cancelled) { add('PASO 2/3 — Escribiendo contenido completo...'); setProg(35) }
@@ -316,7 +316,7 @@ function StepGenerating({ formData, onDone }) {
             '{"capitulos":[{"numero":1,"titulo":"...","contenido":"texto completo con formato...","puntos_clave":["..."],"tip":"..."}]}',
           ].filter(Boolean).join('\n')
 
-          const r2 = await callGemini(p2, 8192)
+          const r2 = await callGemini(p2, 4096)
           const caps1 = JSON.parse(r2.replace(/```json|```/g, '').trim())
 
           if (!cancelled) { add('PASO 3/3 — Escribiendo segunda mitad y bonos...'); setProg(65) }
@@ -338,7 +338,7 @@ function StepGenerating({ formData, onDone }) {
             '{"capitulos":[{"numero":' + (mitad + 1) + ',"titulo":"...","contenido":"...","puntos_clave":["..."],"tip":"..."}],"plan_accion":["AHORA: ...","MAÑANA: ...","EN 3 DÍAS: ..."],"cierre":"...","bonos":[{"numero":1,"titulo":"...","contenido":"texto completo del bono...","plan_accion_24hs":["..."]}]}',
           ].filter(Boolean).join('\n')
 
-          const r3 = await callGemini(p3, 8192)
+          const r3 = await callGemini(p3, 4096)
           const caps2 = JSON.parse(r3.replace(/```json|```/g, '').trim())
 
           if (!cancelled) { add('Contenido completo generado ✓'); setProg(100) }
@@ -379,7 +379,7 @@ function StepGenerating({ formData, onDone }) {
             '{"titulo":"...","subtitulo":"...","tagline":"...","introduccion":"texto completo...","capitulos":[{"numero":1,"titulo":"...","subtitulo":"..."}]}',
           ].filter(Boolean).join('\n')
 
-          const r1 = await callGemini(p1, 4096)
+          const r1 = await callGemini(p1, 2048)
           const estructura = JSON.parse(r1.replace(/```json|```/g, '').trim())
 
           if (!cancelled) { add('Escribiendo primera mitad del ebook...'); setProg(40) }
@@ -401,29 +401,29 @@ function StepGenerating({ formData, onDone }) {
             '{"capitulos":[{"numero":1,"titulo":"...","contenido":"texto completo...","puntos_clave":["..."],"tip":"..."}]}',
           ].filter(Boolean).join('\n')
 
-          const r2 = await callGemini(p2, 8192)
+          const r2 = await callGemini(p2, 4096)
           const caps1 = JSON.parse(r2.replace(/```json|```/g, '').trim())
 
           if (!cancelled) { add('Escribiendo segunda mitad y bonos...'); setProg(65) }
 
           const p3 = [
-            'Continuá el ebook "' + estructura.titulo + '". Mismo tono: ' + tono,
+            'Continuá el ebook "' + estructura.titulo + '". Tono: ' + tono,
             '',
-            'Escribí los capítulos ' + (numCapsFirst + 1) + ' al ' + numCaps + ':',
-            capsTitulos.split('\n').slice(numCapsFirst).join('\n'),
+            'Escribí SOLO los capítulos ' + (numCapsFirst + 1) + ' al ' + Math.min(numCaps, numCapsFirst + 15) + ':',
+            capsTitulos.split('\n').slice(numCapsFirst, numCapsFirst + 15).join('\n'),
             '',
-            'Mismas reglas: mínimo 400 palabras por capítulo, formato visual.',
+            'Reglas: mínimo 200 palabras por capítulo, bullets y listas.',
             '',
-            'Al final:',
-            '- PLAN DE ACCIÓN 72hs: AHORA / MAÑANA / EN 3 DÍAS',
-            '- CARTA DE CIERRE motivadora (10 líneas)',
-            numBonos > 0 ? '- ' + numBonos + ' BONOS de ' + paginasPorBono + ' páginas c/u. Cada bono resuelve una objeción específica.' : '',
+            'Al final agregá:',
+            '- plan_accion: ["AHORA: paso","MAÑANA: paso","EN 3 DIAS: paso"]',
+            '- cierre: carta motivadora de 5 líneas',
+            numBonos > 0 ? '- bonos: ' + numBonos + ' bonos de ' + Math.min(paginasPorBono, 10) + ' páginas c/u' : '',
             '',
             'JSON sin markdown:',
-            '{"capitulos":[{"numero":' + (numCapsFirst + 1) + ',"titulo":"...","contenido":"...","puntos_clave":["..."],"tip":"..."}],"plan_accion":["AHORA: ...","MAÑANA: ...","EN 3 DÍAS: ..."],"cierre":"...","bonos":[{"numero":1,"titulo":"...","contenido":"texto completo...","plan_accion_24hs":["..."]}]}',
+            '{"capitulos":[{"numero":' + (numCapsFirst + 1) + ',"titulo":"...","contenido":"...","puntos_clave":["..."],"tip":"..."}],"plan_accion":["AHORA: ...","MAÑANA: ...","EN 3 DIAS: ..."],"cierre":"...","bonos":[{"numero":1,"titulo":"...","contenido":"contenido del bono...","plan_accion_24hs":["..."]}]}',
           ].filter(Boolean).join('\n')
 
-          const r3 = await callGemini(p3, 8192)
+          const r3 = await callGemini(p3, 4096)
           const caps2 = JSON.parse(r3.replace(/```json|```/g, '').trim())
 
           if (!cancelled) { add('Ebook completo generado ✓'); setProg(100) }
